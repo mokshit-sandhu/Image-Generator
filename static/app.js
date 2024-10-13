@@ -7,10 +7,12 @@ document.getElementById('downloadForm').addEventListener('submit', function(e) {
     const downloadLink = document.getElementById('downloadLink');
     const waitingMessage = document.getElementById('waitingMessage');
 
+
     console.log('Keyword:', keyword);
     console.log('Number of Images:', numImages);
     console.log('Email Address:', emailAddress);
-r
+
+
     waitingMessage.style.display = 'block';
 
     fetch('http://127.0.0.1:5000/api/download_images', {
@@ -18,7 +20,7 @@ r
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ keyword: keyword, num_images: numImages, email: emailAddress })
+        body: JSON.stringify({ keyword: keyword, num_images: numImages, email: emailAddress }) 
     })
     .then(response => {
         if (!response.ok) {
@@ -33,6 +35,7 @@ r
         downloadLink.style.display = 'block';
         downloadLink.innerText = 'Download Zip';
 
+     
         waitingMessage.style.display = 'none';
     })
     .catch(error => {
@@ -40,6 +43,7 @@ r
         const errorMessage = error.error ? error.error : 'An unexpected error occurred.';
         document.getElementById('result').innerText = errorMessage;
 
+    
         waitingMessage.style.display = 'none';
     });
 });

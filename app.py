@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_file
 from flask_cors import CORS
 from flask_mail import Mail, Message
 from googleapiclient.discovery import build
@@ -29,7 +29,7 @@ def google_image_downloader(keyword, num_images, output_dir):
         q=keyword,
         cx=SEARCH_ENGINE_ID,
         searchType="image",
-        num=num_images
+        num=min(num_images, 10)  
     ).execute()
 
     if not os.path.exists(output_dir):
@@ -52,28 +52,30 @@ def index():
 @app.route('/api/download_images', methods=['POST'])
 def download_images():
     data = request.json
-    keyword = data.get('keyword')
+    keyword = data.get('keyword').strip()
     num_images = data.get('num_images', 10)
     email = data.get('email')
-    
+
     output_path = os.path.join(OUTPUT_DIR, keyword)
-    
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
-    
+
+    os.makedirs(output_path, exist_ok=True)
+
     try:
         google_image_downloader(keyword, num_images, output_path)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
+
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        for filename in os.listdir(output_path):
-            file_path = os.path.join(output_path, filename)
-            zip_file.write(file_path, filename)
+        try:
+            for filename in os.listdir(output_path):
+                file_path = os.path.join(output_path, filename)
+                zip_file.write(file_path, filename)
+        except FileNotFoundError as e:
+            return jsonify({'error': f'Directory not found: {str(e)}'}), 500
 
     zip_buffer.seek(0)
-    
+
     try:
         msg = Message(f'Your Downloaded Images: {keyword}', recipients=[email])
         msg.body = 'Attached is the zip file containing the downloaded images.'
@@ -82,10 +84,17 @@ def download_images():
         response_message = f'Zip file has been emailed to {email}'
     except Exception as e:
         return jsonify({'error': f'Error sending email: {str(e)}'}), 500
-    finally:
-        shutil.rmtree(output_path)
+
+    zip_buffer.seek(0)
+
+    shutil.rmtree(output_path)
     
-    return jsonify({'message': response_message}), 200
+    return send_file(
+        zip_buffer,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=f'{keyword}_images.zip'
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)
